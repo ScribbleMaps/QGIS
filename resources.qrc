@@ -1,0 +1,11 @@
+<RCC>
+    <qresource prefix="/plugins/scribblemaps_connector">
+        <file>icon.png</file>
+        <file>link.png</file>
+        <file>broken_link.png</file>
+        <file>down.png</file>
+        <file>refresh.png</file>
+        <file>icon_download.png</file>
+        <file>icon_upload.png</file>
+    </qresource>
+</RCC>
