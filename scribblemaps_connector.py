@@ -326,10 +326,6 @@ class ScribbleMapsConnector:
                 destLine = QgsVectorLayer("LineString?crs=epsg:4326",  'Lines: ' + str(self.loadDlg.tblMaps.item(self.loadDlg.tblMaps.currentRow(), 1).text()), "memory")
                 destPoly = QgsVectorLayer("Polygon?crs=epsg:4326",  'Polygons: ' + str(self.loadDlg.tblMaps.item(self.loadDlg.tblMaps.currentRow(), 1).text()), "memory")
 
-                QgsProject.instance().addMapLayer(destPoint)
-                QgsProject.instance().addMapLayer(destLine)
-                QgsProject.instance().addMapLayer(destPoly)
-
                 # Add attributes:
                 srcAtts = srcLayer.dataProvider().fields().toList()
 
@@ -354,6 +350,13 @@ class ScribbleMapsConnector:
                     elif QgsWkbTypes.flatType(feat.geometry().wkbType()) == QgsWkbTypes.Polygon:
                         destPolyData.addFeatures([feat])
 
+                if (destPoint.featureCount() > 0):
+                    QgsProject.instance().addMapLayer(destPoint)
+                if (destLine.featureCount() > 0):
+                    QgsProject.instance().addMapLayer(destLine)
+                if (destPoly.featureCount() > 0):
+                    QgsProject.instance().addMapLayer(destPoly)
+
                 # Clean up
                 del srcLayer
                 # Close (and automatically delete) file:
@@ -372,7 +375,10 @@ class ScribbleMapsConnector:
             self.handleException(e)
 
     def _loadSelectedMapInternal(self):
-        mapResult = requests.get('https://www.scribblemaps.com/api/maps/' + self.lastSelectedMapCode + '/kml', headers={ 'Authorization': 'Bearer ' + self.current_token})
+        mapUrl = 'https://www.scribblemaps.com/api/maps/' + self.lastSelectedMapCode + '/kml'
+        QgsMessageLog.logMessage('Fetching map from URL: ' + mapUrl, 'Scribble Maps')
+        mapResult = requests.get(mapUrl, headers={ 'Authorization': 'Bearer ' + self.current_token})
+        QgsMessageLog.logMessage('Results: ' +  str(mapResult.status_code) + ' - ' + str(mapResult.content), 'Scribble Maps')
         self.lastLoadedMap = mapResult.content
 
     def showLoadDlg(self):
@@ -546,15 +552,15 @@ class ScribbleMapsConnector:
                 return
 
             if not response.status_code == 200:
-                QgsMessageLog.logMessage('Getting Map Code - ' + str(response.status_code) + ': ' + response.text, 'Debug Output')
-                self.pendingErrorDisplay = "We were unable to retrieve a map code to publish! Please check the 'Debug Output' tab for any relevant messages."
+                QgsMessageLog.logMessage('Getting Map Code - ' + str(response.status_code) + ': ' + response.text, 'Scribble Maps')
+                self.pendingErrorDisplay = "We were unable to retrieve a map code to publish! Please check the 'Scribble Maps' tab for any relevant messages."
                 self.lastPublishedMapCode = False
                 return
 
             responseJSON = response.json()
             if not responseJSON or not "streamCode" in responseJSON:
-                QgsMessageLog.logMessage('Creating Stream - ' + str(response.status_code) + ': ' + response.text, 'Debug Output')
-                self.pendingErrorDisplay = "We were unable to retrieve a map code to publish! Please check the 'Debug Output' tab for any relevant messages."
+                QgsMessageLog.logMessage('Creating Stream - ' + str(response.status_code) + ': ' + response.text, 'Scribble Maps')
+                self.pendingErrorDisplay = "We were unable to retrieve a map code to publish! Please check the 'Scribble Maps' tab for any relevant messages."
                 self.lastPublishedMapCode = False
                 return
 
@@ -566,9 +572,9 @@ class ScribbleMapsConnector:
                 'data': json.dumps(mergedSMJSON)
             })
             if not response.status_code == 200:
-                QgsMessageLog.logMessage('Publishing SMJSON to Stream - ' + str(response.status_code) + ': ' + response.text, 'Debug Output')
-                QgsMessageLog.logMessage('JSON body being published: ' + json.dumps(mergedSMJSON), 'Debug Output')
-                self.pendingErrorDisplay = "We did not receive a successful status when publishing map data! Please check the 'Debug Output' tab for any relevant messages."
+                QgsMessageLog.logMessage('Publishing SMJSON to Stream - ' + str(response.status_code) + ': ' + response.text, 'Scribble Maps')
+                QgsMessageLog.logMessage('JSON body being published: ' + json.dumps(mergedSMJSON), 'Scribble Maps')
+                self.pendingErrorDisplay = "We did not receive a successful status when publishing map data! Please check the 'Scribble Maps' tab for any relevant messages."
                 self.lastPublishedMapCode = False
                 return
 
