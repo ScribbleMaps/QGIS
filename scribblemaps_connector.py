@@ -315,7 +315,7 @@ class ScribbleMapsConnector:
                 progressBar.setValue((progressBar.value() + 1 % 100))
 
             if (len(self.lastLoadedMap) > 0):
-                tempKML = NamedTemporaryFile()
+                tempKML = NamedTemporaryFile(delete=False)
                 tempKML.write(self.lastLoadedMap)
                 tempKML.flush()
                 
@@ -361,6 +361,11 @@ class ScribbleMapsConnector:
                 del srcLayer
                 # Close (and automatically delete) file:
                 tempKML.close() 
+                
+                try:
+                    os.unlink(tempKML.name)
+                except:
+                    pass
 
                 # Make sure it's visible:
                 self.iface.mapCanvas().zoomToFullExtent()
