@@ -36,6 +36,7 @@ import json
 import linecache
 import sys
 from tempfile import NamedTemporaryFile
+from html import escape
 
 class ScribbleMapsConnector:
 
@@ -57,10 +58,10 @@ class ScribbleMapsConnector:
         self.actions = []
         self.menu = self.tr(u'&Scribble Maps Connector')
 
-        self.instance_uuid = str(uuid.uuid4())
         self.current_token = False
         self.lastPublishedMapCode = False
         self.pendingErrorDisplay = False
+        self.instance_uuid = False
 
         # Set up connector dialog:
         self.loadDlg = ScribbleMapsConnectorDialog()
@@ -86,7 +87,7 @@ class ScribbleMapsConnector:
 
         self.publishDlg.pbClose.clicked.connect(self.closePublishDlg)
         self.publishDlg.pbPublish.clicked.connect(self.publishMap)
-        
+    
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
@@ -180,7 +181,7 @@ class ScribbleMapsConnector:
             self.handleException(e)
 
     def _checkAuthInternal(self):
-        url = 'https://labs.strategiccode.com/scribble-maps-api/auth/' + self.instance_uuid
+        url = 'https://labs.strategiccode.com/scribble-maps-api/auth/' + self.getInstanceId()
         # Most people won't have run Python/Install Certificates.command on mac... may be an issue on other platforms?
         try:
             _create_unverified_https_context = ssl._create_unverified_context
@@ -191,9 +192,43 @@ class ScribbleMapsConnector:
         result = requests.get(url)
         self.lastThreadResponse = result.json()
     
+    def getInstanceId(self):
+        if self.instance_uuid:
+            return self.instance_uuid
+
+        authManager = QgsApplication.authManager()
+
+        # See if we already have an instance ID we can use to pass to our auth endpoint:
+        if "Scribble Maps Instance ID" in authManager.availableAuthMethodConfigs():
+            auConfig = QgsAuthMethodConfig()
+            authManager.loadAuthenticationConfig('Scribble Maps Instance ID', auConfig, True)
+            configMap = auConfig.configMap()
+            if "sessionid" in configMap:
+                self.instance_uuid = configMap["sessionid"]
+                return self.instance_uuid
+        
+        # Not set or something went wrong retrieving it - make us a new one, which will make them log in with Scribble Maps again
+        self.instance_uuid = str(uuid.uuid4())
+            
+        # Store it securely for future use - but first, see if we need to remove an old one first:
+        if "Scribble Maps Instance ID" in authManager.availableAuthMethodConfigs():
+            authManager.removeAuthenticationConfig('Scribble Maps Instance ID')
+        
+        cfg = QgsAuthMethodConfig()
+        cfg.setId('Scribble Maps Instance ID')
+        cfg.setName('Scribble Maps Instance ID')
+        cfg.setMethod('ExternalConnector')
+        cfg.setConfig('sessionid', str(uuid.uuid4()))
+        authManager.storeAuthenticationConfig(cfg)
+
     def clearAuth(self):
         self.current_token = False
-        self.instance_uuid = str(uuid.uuid4())
+        
+        self.instance_uuid = False
+        authManager = QgsApplication.authManager()
+        if "Scribble Maps Instance ID" in authManager.availableAuthMethodConfigs():
+            authManager.removeAuthenticationConfig('Scribble Maps Instance ID')
+        
         self.loadDlg.pbLink.setEnabled(True)
         self.loadDlg.pbUnlink.setEnabled(False)
         self.loadDlg.pbRefresh.setEnabled(False)
@@ -383,7 +418,7 @@ class ScribbleMapsConnector:
         mapUrl = 'https://www.scribblemaps.com/api/maps/' + self.lastSelectedMapCode + '/kml'
         QgsMessageLog.logMessage('Fetching map from URL: ' + mapUrl, 'Scribble Maps')
         mapResult = requests.get(mapUrl, headers={ 'Authorization': 'Bearer ' + self.current_token})
-        QgsMessageLog.logMessage('Results: ' +  str(mapResult.status_code) + ' - ' + str(mapResult.content), 'Scribble Maps')
+        QgsMessageLog.logMessage('Results: ' +  str(mapResult.status_code) + ' - ' + escape(mapResult.text), 'Scribble Maps')
         self.lastLoadedMap = mapResult.content
 
     def showLoadDlg(self):
